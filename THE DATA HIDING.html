@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steganography Vault | Hide Secrets in Plain Sight</title>
+<style>
+  :root{
+    --bg1:#050410; --bg2:#0b0822; --bg3:#161233;
+    --accent:#8e2de2; --accent2:#4a00e0;
+    --glass:rgba(255,255,255,0.04);
+    --glass-border:rgba(255,255,255,0.1);
+    --text:#f1f1fb; --muted:#a9a6c9;
+    --success:#3ddc97; --danger:#ff193f;
+    --warning:#ffb407;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  
+  body{
+    min-height:100vh;
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif; 
+    background: radial-gradient(circle at 50% 50%, var(--bg3) 0%, var(--bg2) 50%, var(--bg1) 100%);
+    color:var(--text);
+    display:flex; flex-direction:column; align-items:center;
+    padding:30px 16px 60px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Moving Sky Background Layers */
+  .sky-glow, .star-field {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+  }
+  
+  .sky-glow {
+    z-index: -2;
+    background: radial-gradient(circle at 30% 20%, rgba(142, 45, 226, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at 70% 80%, rgba(74, 0, 224, 0.12) 0%, transparent 50%);
+    filter: blur(30px);
+    animation: nebulaPan 25s ease infinite alternate;
+  }
+
+  .star-field {
+    z-index: -1;
+    background-image: 
+      radial-gradient(white, rgba(255,255,255,.3) 1px, transparent 30px),
+      radial-gradient(white, rgba(255,255,255,.2) 1.5px, transparent 40px);
+    background-size: 400px 400px;
+    background-position: 0 0;
+    opacity: 0.5;
+    animation: skyScroll 40s linear infinite;
+  }
+
+  .star-field-fast {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: -1;
+    background-image: radial-gradient(white, rgba(255,255,255,.15) 2px, transparent 50px);
+    background-size: 600px 600px;
+    opacity: 0.3;
+    animation: skyScroll 25s linear infinite;
+  }
+
+  @keyframes skyScroll {
+    from { background-position: 0 0; }
+    to { background-position: 0 1000px; }
+  }
+
+  @keyframes nebulaPan {
+    0% { transform: scale(1) translate(0px, 0px); }
+    50% { transform: scale(1.15) translate(-30px, 20px); }
+    100% { transform: scale(1) translate(30px, -20px); }
+  }
+
+  header{text-align:center; margin-bottom:30px; position: relative;}
+  .logo{
+    font-size:2.4rem; font-weight:800;
+    background:linear-gradient(90deg,#a770ef,#cf8bf3,#fdb99b);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    letter-spacing:1px;
+    filter: drop-shadow(0 2px 10px rgba(167, 112, 239, 0.3));
+  }
+  .tagline{color:var(--muted); margin-top:6px; font-size:0.95rem;}
+
+  .container{width:100%; max-width:600px; position: relative; z-index: 2;}
+
+  .tabs{display:flex; gap:10px; justify-content:center; margin-bottom:24px;}
+  .tab-btn{
+    padding:12px 28px; border-radius:30px; border:1px solid var(--glass-border);
+    background:var(--glass); color:var(--text); cursor:pointer; font-size:1rem;
+    font-weight:600; transition:.25s; backdrop-filter:blur(8px);
+  }
+  .tab-btn.active{
+    background:linear-gradient(90deg,var(--accent2),var(--accent));
+    box-shadow:0 0 20px rgba(142,45,226,0.5);
+    border-color:transparent;
+  }
+
+  .panel{
+    display:none;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    border-radius:22px;
+    padding:28px;
+    backdrop-filter:blur(16px);
+    box-shadow:0 12px 40px rgba(0,0,0,0.5);
+  }
+  .panel.active{display:block;}
+
+  .form-group { margin-bottom: 20px; }
+  label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--muted); }
+  input[type="file"], input[type="password"] {
+    width: 100%; padding: 12px; background: rgba(0,0,0,0.3);
+    border: 1px dashed var(--muted); border-radius: 8px; color: var(--text);
+  }
+  input[type="password"] {
+    border-style: solid; background: rgba(255,255,255,0.03);
+  }
+  input[type="password"]:focus {
+    outline: none; border-color: var(--accent);
+  }
+  
+  /* Password Strength Meter Styling */
+  .strength-container {
+    margin-top: 8px;
+    display: none;
+  }
+  .strength-bar-bg {
+    width: 100%; height: 6px; background: rgba(255,255,255,0.1);
+    border-radius: 3px; overflow: hidden; margin-bottom: 4px;
+  }
+  .strength-bar {
+    width: 0%; height: 100%; transition: width 0.3s ease, background-color 0.3s ease;
+  }
+  .strength-text {
+    font-size: 0.85rem; font-weight: 600;
+  }
+  
+  .action-btn {
+    width: 100%; padding: 14px; border-radius: 12px; border: none;
+    background: linear-gradient(90deg, var(--success), #28b473);
+    color: #111; font-size: 1.1rem; font-weight: bold; cursor: pointer;
+    transition: 0.3s; margin-top: 10px;
+  }
+  .action-btn:hover { box-shadow: 0 0 15px rgba(61, 220, 151, 0.4); transform: translateY(-2px); }
+
+  .status-box {
+    margin-top: 20px; padding: 15px; border-radius: 12px;
+    background: rgba(0,0,0,0.4); display: none; text-align: center;
+  }
+  .download-link {
+    display: inline-block; margin-top: 15px; color: var(--success);
+    text-decoration: none; font-weight: bold; border-bottom: 1px solid var(--success);
+  }
+
+  .preview-viewport {
+    margin-top: 15px;
+    width: 100%;
+    max-height: 350px;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+  }
+  .preview-viewport img, .preview-viewport video {
+    width: 100%;
+    height: auto;
+    max-height: 350px;
+    object-fit: contain;
+  }
+  .preview-viewport audio {
+    width: 100%;
+    margin: 15px;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky-glow"></div>
+<div class="star-field"></div>
+<div class="star-field-fast"></div>
+
+<header>
+  <div class="logo">Steganography Vault</div>
+  <div class="tagline">Hide Secrets in Plain Sight</div>
+</header>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('hide')">Hide File</button>
+    <button class="tab-btn" onclick="switchTab('reveal')">Reveal File</button>
+  </div>
+
+  <div id="hide-panel" class="panel active">
+    <div class="form-group">
+      <label>1. Select Carrier Image (PNG/JPG)</label>
+      <input type="file" id="carrier-img" accept="image/png, image/jpeg">
+    </div>
+    <div class="form-group">
+      <label>2. Select File to Hide (Video, Audio, Image, etc.)</label>
+      <input type="file" id="secret-file">
+    </div>
+    <div class="form-group">
+      <label>3. Password (Optional [for additional security] - leaves unencrypted if blank)</label>
+      <input type="password" id="hide-pass" placeholder="Enter optional vault password..." oninput="checkPasswordStrength()">
+      
+      <div id="strength-container" class="strength-container">
+        <div class="strength-bar-bg">
+          <div id="strength-bar" class="strength-bar"></div>
+        </div>
+        <span id="strength-text" class="strength-text"></span>
+      </div>
+    </div>
+    <button class="action-btn" onclick="hideProcess()">Encrypt & Hide</button>
+    
+    <div id="hide-status" class="status-box">
+      <p id="hide-msg"></p>
+      <a id="hide-download" class="download-link" style="display:none;">Download Secured Image</a>
+    </div>
+  </div>
+
+  <div id="reveal-panel" class="panel">
+    <div class="form-group">
+      <label>Upload Encrypted Image</label>
+      <input type="file" id="encrypted-img">
+    </div>
+    <div class="form-group" id="reveal-pass-group" style="display:none;">
+      <label>This file requires a Password:</label>
+      <input type="password" id="reveal-pass" placeholder="Enter password to decrypt...">
+    </div>
+    <button class="action-btn" onclick="revealProcess()">Decrypt & Reveal</button>
+    
+    <div id="reveal-status" class="status-box">
+      <p id="reveal-msg"></p>
+      <div id="preview-container" class="preview-viewport" style="display:none;"></div>
+      <br>
+      <a id="reveal-download" class="download-link" style="display:none;">Download Revealed File (Backup)</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const MAGIC_MARKER = "STEG"; 
+  let currentObjectUrl = null; 
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+    
+    if (tab === 'hide') {
+      document.querySelectorAll('.tab-btn')[0].classList.add('active');
+      document.getElementById('hide-panel').classList.add('active');
+    } else {
+      document.querySelectorAll('.tab-btn')[1].classList.add('active');
+      document.getElementById('reveal-panel').classList.add('active');
+    }
+  }
+
+  // Real-time Password Strength Check Function
+  function checkPasswordStrength() {
+    const password = document.getElementById('hide-pass').value;
+    const container = document.getElementById('strength-container');
+    const bar = document.getElementById('strength-bar');
+    const text = document.getElementById('strength-text');
+
+    if (password.length === 0) {
+      container.style.display = "none";
+      return;
+    }
+
+    container.style.display = "block";
+    let score = 0;
+
+    // Metric 1: Length checks
+    if (password.length >= 6) score++;
+    if (password.length >= 10) score++;
+
+    // Metric 2: Content complexity tests
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++; // Mix of cases
+    if (/\d/.test(password)) score++;                             // Contains digits
+    if (/[^A-Za-z0-9]/.test(password)) score++;                  // Special symbols
+
+    // Render results based on calculated score points
+    if (score <= 2) {
+      bar.style.width = "33%";
+      bar.style.backgroundColor = "var(--danger)";
+      text.innerText = "Weak Password";
+      text.style.color = "var(--danger)";
+    } else if (score === 3 || score === 4) {
+      bar.style.width = "66%";
+      bar.style.backgroundColor = "var(--warning)";
+      text.innerText = "Medium Password";
+      text.style.color = "var(--warning)";
+    } else {
+      bar.style.width = "100%";
+      bar.style.backgroundColor = "var(--success)";
+      text.innerText = "Strong Password";
+      text.style.color = "var(--success)";
+    }
+  }
+
+  async function deriveKey(password, salt) {
+    const encoder = new TextEncoder();
+    const baseKey = await crypto.subtle.importKey(
+      "raw", encoder.encode(password), { name: "PBKDF2" }, false, ["deriveKey"]
+    );
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" },
+      baseKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+    );
+  }
+
+  async function hideProcess() {
+    const carrier = document.getElementById('carrier-img').files[0];
+    const secret = document.getElementById('secret-file').files[0];
+    const password = document.getElementById('hide-pass').value;
+    const statusBox = document.getElementById('hide-status');
+    const msg = document.getElementById('hide-msg');
+    const download = document.getElementById('hide-download');
+
+    if (!carrier || !secret) {
+      alert("Please select both a carrier image and a file to hide.");
+      return;
+    }
+
+    statusBox.style.display = "block";
+    msg.innerText = "Processing...";
+    download.style.display = "none";
+
+    try {
+      const carrierBuffer = await carrier.arrayBuffer();
+      let secretBuffer = await secret.arrayBuffer();
+      
+      let isEncrypted = false;
+      let saltBytes = new Uint8Array(0);
+      let ivBytes = new Uint8Array(0);
+
+      if (password) {
+        isEncrypted = true;
+        saltBytes = crypto.getRandomValues(new Uint8Array(16));
+        ivBytes = crypto.getRandomValues(new Uint8Array(12));
+        
+        const cryptoKey = await deriveKey(password, saltBytes);
+        secretBuffer = await crypto.subtle.encrypt(
+          { name: "AES-GCM", iv: ivBytes }, cryptoKey, secretBuffer
+        );
+      }
+
+      const metaObj = { 
+        name: secret.name, 
+        type: secret.type, 
+        size: secretBuffer.byteLength,
+        encrypted: isEncrypted,
+        salt: Array.from(saltBytes),
+        iv: Array.from(ivBytes)
+      };
+
+      const encoder = new TextEncoder();
+      const metaBytes = encoder.encode(JSON.stringify(metaObj));
+
+      const sizeBuffer = new ArrayBuffer(4);
+      new DataView(sizeBuffer).setUint32(0, metaBytes.length, true);
+
+      const magicBytes = encoder.encode(MAGIC_MARKER);
+
+      const combinedBlob = new Blob([
+        carrierBuffer, 
+        secretBuffer, 
+        metaBytes, 
+        sizeBuffer, 
+        magicBytes
+      ], { type: 'image/png' });
+
+      if(currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+      currentObjectUrl = URL.createObjectURL(combinedBlob);
+      
+      download.href = currentObjectUrl;
+      download.download = `secured_image.png`;
+      
+      msg.innerText = password 
+        ? "Success! Your file is encrypted and hidden inside the image."
+        : "Success! Your file is hidden inside the image (unencrypted).";
+      download.style.display = "inline-block";
+    } catch (e) {
+      msg.innerText = "An error occurred: " + e.message;
+    }
+  }
+
+  async function revealProcess() {
+    const file = document.getElementById('encrypted-img').files[0];
+    const passwordField = document.getElementById('reveal-pass');
+    const passGroup = document.getElementById('reveal-pass-group');
+    const statusBox = document.getElementById('reveal-status');
+    const msg = document.getElementById('reveal-msg');
+    const download = document.getElementById('reveal-download');
+    const previewContainer = document.getElementById('preview-container');
+
+    if (!file) {
+      alert("Please upload an encrypted image.");
+      return;
+    }
+
+    statusBox.style.display = "block";
+    download.style.display = "none";
+    previewContainer.style.display = "none";
+    previewContainer.innerHTML = ""; 
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const decoder = new TextDecoder();
+
+      const magicBytes = buffer.slice(buffer.byteLength - 4);
+      if (decoder.decode(magicBytes) !== MAGIC_MARKER) {
+        msg.innerText = "Error: No hidden file detected in this image.";
+        passGroup.style.display = "none";
+        return;
+      }
+
+      const sizeBytes = buffer.slice(buffer.byteLength - 8, buffer.byteLength - 4);
+      const metaSize = new DataView(sizeBytes).getUint32(0, true);
+
+      const metaStart = buffer.byteLength - 8 - metaSize;
+      const metaBytes = buffer.slice(metaStart, buffer.byteLength - 8);
+      const metaObj = JSON.parse(decoder.decode(metaBytes));
+
+      if (metaObj.encrypted) {
+        passGroup.style.display = "block";
+        const password = passwordField.value;
+        if (!password) {
+          msg.innerText = "This hidden file is encrypted. Please enter the password above and click Decrypt again.";
+          return;
+        }
+
+        msg.innerText = "Decrypting file...";
+        
+        const dataEnd = metaStart;
+        const dataStart = dataEnd - metaObj.size;
+        let secretBytes = buffer.slice(dataStart, dataEnd);
+
+        try {
+          const saltBytes = new Uint8Array(metaObj.salt);
+          const ivBytes = new Uint8Array(metaObj.iv);
+          const cryptoKey = await deriveKey(password, saltBytes);
+          
+          secretBytes = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: ivBytes }, cryptoKey, secretBytes
+          );
+          
+          buildOutput(secretBytes, metaObj);
+        } catch (err) {
+          msg.innerText = "Incorrect Password! Could not decrypt the data.";
+        }
+      } else {
+        passGroup.style.display = "none";
+        const dataEnd = metaStart;
+        const dataStart = dataEnd - metaObj.size;
+        const secretBytes = buffer.slice(dataStart, dataEnd);
+        buildOutput(secretBytes, metaObj);
+      }
+    } catch (e) {
+      msg.innerText = "Error extracting file. It may be corrupted or modified.";
+      console.error(e);
+    }
+  }
+
+  function buildOutput(bytes, metaObj) {
+    const msg = document.getElementById('reveal-msg');
+    const download = document.getElementById('reveal-download');
+    const previewContainer = document.getElementById('preview-container');
+
+    const secretBlob = new Blob([bytes], { type: metaObj.type });
+    
+    if(currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+    currentObjectUrl = URL.createObjectURL(secretBlob);
+    
+    msg.innerText = `Success! Found hidden file: ${metaObj.name}`;
+
+    if (metaObj.type.startsWith('image/')) {
+      previewContainer.innerHTML = `<img src="${currentObjectUrl}" alt="Revealed Secret">`;
+      previewContainer.style.display = "flex";
+    } else if (metaObj.type.startsWith('video/')) {
+      previewContainer.innerHTML = `<video src="${currentObjectUrl}" controls autoplay style="width:100%;"></video>`;
+      previewContainer.style.display = "flex";
+    } else if (metaObj.type.startsWith('audio/')) {
+      previewContainer.innerHTML = `<audio src="${currentObjectUrl}" controls autoplay></audio>`;
+      previewContainer.style.display = "flex";
+    } else {
+      msg.innerText += " (Inline preview not supported for this file type)";
+    }
+    download.href = currentObjectUrl;
+    download.download = metaObj.name;
+    download.style.display = "inline-block";
+  }
+</script>
+</body>
+</html>
